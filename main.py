@@ -44,11 +44,9 @@ class ImageRestorationClass(QMainWindow):
         self.ui.setupUi(self)
 
         # Assigning functions to be called on all button clicked events and
-        # slider value changed events
+        # combo box change events
         self.ui.buttonOpen.clicked.connect(lambda: self.open_image())
         self.ui.buttonSave.clicked.connect(lambda: self.save_image())
-        # self.ui.buttonUndoAll.clicked.connect(lambda: self.undoAll())
-
         self.ui.buttonFullInv.clicked.connect(lambda: self.call_full_inverse())
         self.ui.buttonInv.clicked.connect(lambda: self.call_truncated_inverse_filter())
         self.ui.buttonWeiner.clicked.connect(lambda: self.call_weiner_filter())
@@ -60,29 +58,36 @@ class ImageRestorationClass(QMainWindow):
 
         self.ui.comboBoxKernel.currentIndexChanged.connect(lambda: self.displayKernel())
 
-        # Initialization of buttons and sliders
+        # disable all buttons initially, except open image button
         self.disableAll()
 
+    # calls the full inverse function
     def call_full_inverse(self):
         if not np.array_equal(self.originalImage, np.array([0])):
+            # read the selected blur kernel
             blur_kernel = self.get_blur_kernel()
             self.currentImage = ir.full_inverse_filter(self.originalImage, blur_kernel)
             self.displayOutputImage()
 
+            # compute psnr and ssim for output if true image is available
             if not np.array_equal(self.trueImage, np.array([0])):
                 self.calculate_psnr()
                 self.calculate_ssim()
 
+    # calls the truncated inverse function
     def call_truncated_inverse_filter(self):
         self.ui.input_radius.setStyleSheet("background-color: white;")
         if not np.array_equal(self.originalImage, np.array([0])):
+            # read the selected blur kernel
             blur_kernel = self.get_blur_kernel()
+            # read the blur kernel radius from line edit input object
             R = self.ui.input_radius.text()
             if R and float(R) > 0:
                 radius = float(R)
                 self.currentImage = ir.truncated_inverse_filter(self.originalImage, blur_kernel, radius)
                 self.displayOutputImage()
 
+                # compute psnr and ssim for output if true image is available
                 if not np.array_equal(self.trueImage, np.array([0])):
                     self.calculate_psnr()
                     self.calculate_ssim()
@@ -90,16 +95,20 @@ class ImageRestorationClass(QMainWindow):
             else:
                 self.ui.input_radius.setStyleSheet("background-color: red;")
 
+    # calls the weiner filter function
     def call_weiner_filter(self):
         self.ui.input_K.setStyleSheet("background-color: white;")
         if not np.array_equal(self.originalImage, np.array([0])):
+            # read the selected blur kernel
             blur_kernel = self.get_blur_kernel()
+            # read the K value from line edit input object
             K_str = self.ui.input_K.text()
             if K_str:
                 K = float(K_str)
                 self.currentImage = ir.weiner_filter(self.originalImage, blur_kernel, K)
                 self.displayOutputImage()
 
+                # compute psnr and ssim for output if true image is available
                 if not np.array_equal(self.trueImage, np.array([0])):
                     self.calculate_psnr()
                     self.calculate_ssim()
@@ -107,22 +116,27 @@ class ImageRestorationClass(QMainWindow):
             else:
                 self.ui.input_K.setStyleSheet("background-color: red;")
 
+    # calls the constrained ls function
     def call_constrained_ls_filter(self):
         self.ui.input_gamma.setStyleSheet("background-color: white;")
         if not np.array_equal(self.originalImage, np.array([0])):
+            # read the selected blur kernel
             blur_kernel = self.get_blur_kernel()
+            # read the gamma value from line edit input object
             Y = self.ui.input_gamma.text()
             if Y:
                 gamma = float(Y)
                 self.currentImage = ir.constrained_ls_filter(self.originalImage, blur_kernel, gamma)
                 self.displayOutputImage()
 
+                # compute psnr and ssim for output if true image is available
                 if not np.array_equal(self.trueImage, np.array([0])):
                     self.calculate_psnr()
                     self.calculate_ssim()
             else:
                 self.ui.input_gamma.setStyleSheet("background-color: red;")
 
+    # calls the compute ssim function for input and output image
     def calculate_ssim(self):
         if not (np.array_equal(self.originalImage, np.array([0])) or np.array_equal(self.currentImage, np.array([0]))):
 
@@ -137,6 +151,7 @@ class ImageRestorationClass(QMainWindow):
                 self.ui.label_og_ssim.setText(str(ssim_in))
                 self.ui.label_res_ssim.setText(str(ssim_out))
 
+    # calls the compute psnr function for input and output image
     def calculate_psnr(self):
         if not (np.array_equal(self.originalImage, np.array([0])) or np.array_equal(self.currentImage, np.array([0]))):
 
@@ -147,10 +162,11 @@ class ImageRestorationClass(QMainWindow):
                 # compute psnr for input and output images
                 psnr_in = ir.psnr(self.trueImage, self.originalImage)
                 psnr_out = ir.psnr(self.trueImage, self.currentImage)
-                # display ssim values
+                # display psnr values
                 self.ui.label_og_psnr.setText(str(psnr_in))
                 self.ui.label_res_psnr.setText(str(psnr_out))
 
+    # open true image file
     def set_true_image(self):
         if not (np.array_equal(self.originalImage, np.array([0])) or np.array_equal(self.currentImage, np.array([0]))):
             # open a new Open Image dialog box to select original image
@@ -163,6 +179,7 @@ class ImageRestorationClass(QMainWindow):
                 # read original image
                 self.trueImage = cv2.imread(image_path, 1)
 
+    # clear the current true image
     def reset_true_image(self):
         self.trueImage = [0]
         self.ui.label_og_psnr.setText('--')
@@ -170,15 +187,12 @@ class ImageRestorationClass(QMainWindow):
         self.ui.label_og_ssim.setText('--')
         self.ui.label_res_ssim.setText('--')
 
+    # read the selected blur kernel from kernels folder
     def get_blur_kernel(self):
         index = self.ui.comboBoxKernel.currentIndex()
         kernel_filename = 'kernels/' + str(index + 1) + '.bmp'
         kernel = np.array(cv2.imread(kernel_filename, 0))
         return kernel
-
-    # update Truncated Inverse Filter Radius value
-    def update_radius(self):
-        a = 0
 
     # called when Open button is clicked
     def open_image(self):
@@ -227,13 +241,6 @@ class ImageRestorationClass(QMainWindow):
             save_image_filename = dialog.selectedFiles()[0]
             # write current image to the file path selected by user
             cv2.imwrite(save_image_filename, self.currentImage)
-
-    # def undoAll(self):
-    #     self.currentImage = self.originalImage.copy()
-    #     # displayOutputImage converts current image from ndarry format to pixmap and
-    #     # assigns it to image display label
-    #     self.displayOutputImage()
-    #     self.ui.buttonUndoAll.setEnabled(False)
 
     # displayInputImage converts original image from ndarry format to pixmap and
     # assigns it to input image display label
